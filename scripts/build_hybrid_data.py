@@ -32,6 +32,14 @@ else:
         ("llama3.1:8b", 3400, 5000),
     ]
 
+REFUSAL_PATTERNS = (
+    "tôi không thể",
+    "xin lỗi",
+    "i cannot",
+    "i can't",
+    "as an ai",
+)
+
 
 def get_model_for_index(idx: int) -> str:
     for model_name, start, end in MODEL_BATCHES:
@@ -53,7 +61,12 @@ def find_sentence_cut(words: list, target_ratio: float) -> int:
     return best_idx if best_idx is not None else target_idx
 
 
-def call_ollama(model_name: str, prefix_text: str, target_words: int = 120) -> str:
+def call_ollama(
+    model_name: str,
+    prefix_text: str,
+    target_words: int = 120,
+    temperature: float = 0.7,
+) -> str:
     prompt = (
         "Bạn là một cây bút báo chí tiếng Việt. Hãy viết tiếp đoạn văn sau một cách "
         "tự nhiên, giữ nguyên văn phong, ngữ cảnh và không lặp lại câu đã cho. "
@@ -67,9 +80,9 @@ def call_ollama(model_name: str, prefix_text: str, target_words: int = 120) -> s
         "stream": False,
         "keep_alive": "15m",
         "options": {
-            "temperature": 0.7,
+            "temperature": temperature,
             "top_p": 0.9,
-            "num_predict": 220,
+            "num_predict": 260,
         },
     }
     resp = requests.post(OLLAMA_URL, json=payload, timeout=180)
@@ -80,10 +93,26 @@ def call_ollama(model_name: str, prefix_text: str, target_words: int = 120) -> s
 def clean_ai_output(text: str, prefix_text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     if text.startswith(prefix_text):
-        text = text[len(prefix_text):].strip()
+        text = text[len(prefix_text) :].strip()
     text = re.sub(r"^(Tiếp theo:|Phần viết tiếp:)\s*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
+
+    # Cắt bỏ câu bị ngắt lửng ở cuối do chạm trần num_predict
+    if text and not text.endswith((".", "!", "?", '"', "”")):
+        last_punct = max(text.rfind("."), text.rfind("!"), text.rfind("?"))
+        if last_punct != -1 and last_punct > len(text) * 0.4:
+            text = text[: last_punct + 1].strip()
+
     return text
+
+
+def is_valid_ai_output(ai_part: str) -> bool:
+    if len(ai_part.split()) < 25:
+        return False
+    lower_head = ai_part[:80].lower()
+    if any(p in lower_head for p in REFUSAL_PATTERNS):
+        return False
+    return True
 
 
 def load_done_ids(filepath: str) -> set:
@@ -104,7 +133,9 @@ def main():
         human_records = [json.loads(line) for line in f]
 
     done_ids = load_done_ids(OUTPUT_FILE)
-    print(f"Chế độ Test: {IS_TEST_MODE} | Đã có: {len(done_ids)} mẫu | Chạy [{START_INDEX}, {END_INDEX})...")
+    print(
+        f"Chế độ Test: {IS_TEST_MODE} | Đã có: {len(done_ids)} mẫu | Chạy [{START_INDEX}, {END_INDEX})..."
+    )
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "a", encoding="utf-8") as out:
@@ -118,18 +149,35 @@ def main():
             cut_idx = find_sentence_cut(words, rng.uniform(0.3, 0.6))
             human_prefix = " ".join(words[:cut_idx])
 
-            model_name = get_model_for_index(idx)
-            try:
-                raw_ai = call_ollama(model_name, human_prefix, target_words=120)
-                ai_part = clean_ai_output(raw_ai, human_prefix)
-            except Exception as e:
-                print(f"\n[Lỗi mẫu {rec['id']} với {model_name}]: {e}")
+            primary_model = get_model_for_index(idx)
+            # Thử model chính 3 lần (tăng nhẹ temperature nếu lỗi); nếu vẫn từ chối thì dùng qwen2.5:7b cứu mẫu
+            attempts = [
+                (primary_model, 0.7),
+                (primary_model, 0.85),
+                (primary_model, 0.95),
+                ("qwen2.5:7b", 0.7),
+            ]
+
+            used_model = primary_model
+            ai_part = ""
+            for model_name, temp in attempts:
+                try:
+                    raw_ai = call_ollama(
+                        model_name, human_prefix, target_words=120, temperature=temp
+                    )
+                    cleaned = clean_ai_output(raw_ai, human_prefix)
+                    if is_valid_ai_output(cleaned):
+                        ai_part = cleaned
+                        used_model = model_name
+                        break
+                except Exception as e:
+                    print(f"\n[Thử lại mẫu {rec['id']} với {model_name}]: {e}")
+
+            if not ai_part:
+                print(f"\n[Bỏ qua mẫu {rec['id']}] Không thể sinh hợp lệ sau 4 lần thử.")
                 continue
 
             ai_words = ai_part.split()
-            if len(ai_words) < 30:
-                continue
-
             human_words = human_prefix.split()
             full_words = human_words + ai_words
             word_labels = [0] * len(human_words) + [1] * len(ai_words)
@@ -137,7 +185,7 @@ def main():
             hybrid_record = {
                 "id": f"hybrid_{idx:05d}",
                 "parent_human_id": rec["id"],
-                "generator_model": model_name,
+                "generator_model": used_model,
                 "label": 2,
                 "boundary_word_idx": len(human_words),
                 "human_part": human_prefix,
