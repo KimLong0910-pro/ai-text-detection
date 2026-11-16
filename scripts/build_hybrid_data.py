@@ -16,11 +16,11 @@ IS_TEST_MODE = True
 if IS_TEST_MODE:
     OUTPUT_FILE = "data/processed/hybrid_test.jsonl"
     START_INDEX = 0
-    END_INDEX = 18
+    END_INDEX = 15
     MODEL_BATCHES = [
-        ("qwen2.5:7b", 0, 6),
-        ("gemma2:9b", 6, 12),
-        ("llama3.1:8b", 12, 18),
+        ("qwen2.5:7b", 0, 5),
+        ("gemma2:9b", 5, 10),
+        ("llama3.1:8b", 10, 15),
     ]
 else:
     OUTPUT_FILE = "data/processed/hybrid_part1_long.jsonl"
