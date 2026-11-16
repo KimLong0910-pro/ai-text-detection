@@ -1,0 +1,24 @@
+# Hệ điều hành macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Môi trường ảo & Cache Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE (VS Code)
+.vscode/
+.idea/
+
+# Dữ liệu lớn (tránh chạm giới hạn 100MB của GitHub)
+data/raw/
+data/processed/*.jsonl
+*.zip
+*.tar.gz
