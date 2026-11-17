@@ -17,7 +17,7 @@ MAX_WORDS = 400
 
 def clean_sentence(raw_text: str) -> str:
     text = unicodedata.normalize("NFC", raw_text).strip()
-    if re.match(r"^(Ảnh\s*:|Xem thêm|Đọc thêm|Tin liên quan|\(Ảnh)", text, re.I):
+    if re.match(r"^(Ảnh\s*:|Xem thêm|Đọc thêm|Tin liên quan|\(Ảnh)", text, re.IGNORECASE):
         return ""
 
     text = re.sub(r"\s+([.,!?;:%\)\]\}])", r"\1", text)

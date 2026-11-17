@@ -124,7 +124,7 @@ def load_done_ids(filepath: str) -> set:
         for line in f:
             try:
                 done.add(json.loads(line)["parent_human_id"])
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
     return done
 
@@ -173,7 +173,7 @@ def main():
                     if is_valid_ai_output(cleaned):
                         ai_part = cleaned
                         break
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"\n[Chờ 3s thử lại {rec['id']} với {model_name}]: {e}")
                     time.sleep(3)
 
