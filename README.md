@@ -38,8 +38,8 @@ ai-text-detection/
 ├── data/
 │   ├── raw/                     # Bộ dữ liệu gốc VietNews (ignored trên Git)
 │   └── processed/               # Các file .jsonl đầu ra (ignored trên Git)
-│       ├── human_10k.jsonl      # 10.000 mẫu văn bản người viết đã làm sạch
-│       └── hybrid_test.jsonl    # 15 mẫu dữ liệu lai chạy thử nghiệm
+│       ├── human_binhvq_10k.jsonl      # 10.000 mẫu văn bản người viết đã làm sạch
+│       └── hybrid_binhvq_test.jsonl    # 15 mẫu dữ liệu lai chạy thử nghiệm
 ├── scripts/
 │   ├── build_human_data.py      # Script lọc và làm sạch 10.000 mẫu Human
 │   └── build_hybrid_data.py     # Script gọi Ollama sinh dữ liệu Hybrid
@@ -155,3 +155,40 @@ tail -n 2 data/processed/hybrid_test.jsonl
 - [ ] Chạy chính thức đủ 10.000 mẫu Hybrid (ghép `hybrid_part1_long.jsonl` và `hybrid_part2_phat.jsonl` thành `hybrid_10k.jsonl`).
 - [ ] Bổ sung dữ liệu sinh hoàn toàn bởi AI (`ai_only`) nếu mở rộng sang bài toán phân loại 3 lớp (Human / AI / Hybrid).
 - [ ] Chia tập `train / val / test` theo `parent_human_id` để chống rò rỉ dữ liệu (Data Leakage) và huấn luyện các mô hình baseline (PhoBERT, XLM-RoBERTa).
+
+
+## 🧹 Dọn dẹp dữ liệu & Giải phóng dung lượng (macOS)
+
+> **⚠️ Lưu ý quan trọng trước khi dọn dẹp:** File `.gitignore` đã chặn không cho đẩy dữ liệu `.jsonl` và trọng số mô hình lên GitHub. Hãy chắc chắn bạn đã sao lưu các file kết quả quan trọng (`data/processed/*.jsonl` và thư mục `best_model/`) lên **Google Drive** hoặc **Hugging Face Hub** trước khi chạy các lệnh xóa bên dưới.
+
+### 1. Giải phóng bộ nhớ đệm dữ liệu thô (Làm ngay sau khi chạy xong `build_human_data.py`)
+
+Sau khi đã xuất ra file `data/processed/human_binhvq_10k.jsonl`, bạn có thể xóa ~3 GB file tạm (`.parquet`/`.arrow`) của Hugging Face mà không ảnh hưởng đến các bước sau:
+
+```bash
+rm -rf ~/.cache/huggingface/datasets
+```
+
+### 2. Gỡ bỏ các model LLM sinh dữ liệu (Làm sau khi hoàn tất tạo dữ liệu Hybrid)
+
+Giải phóng ~15–16 GB dung lượng ổ cứng từ 3 model Ollama đã tải:
+
+```bash
+ollama rm qwen2.5:7b gemma2:9b llama3.1:8b
+```
+
+*(Nếu không còn sử dụng Ollama cho bất kỳ tác vụ nào khác, có thể xóa toàn bộ thư mục cấu hình và model bằng lệnh `rm -rf ~/.ollama`).*
+
+### 3. Dọn dẹp toàn diện sau khi kết thúc dự án
+
+Xóa toàn bộ bộ nhớ đệm Hugging Face (bao gồm cả trọng số model huấn luyện):
+
+```bash
+rm -rf ~/.cache/huggingface
+```
+
+Dọn sạch các file nặng trong thư mục dự án nhưng vẫn giữ lại toàn bộ mã nguồn sạch (`scripts/`, `tests/`, `README.md`):
+
+```bash
+rm -rf venv data/raw data/processed/*.jsonl checkpoints results logs __pycache__
+```

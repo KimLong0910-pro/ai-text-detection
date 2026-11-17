@@ -49,7 +49,7 @@ def validate_jsonl(filepath: str, is_hybrid: bool = False):
 
 
 if __name__ == "__main__":
-    validate_jsonl("data/processed/human_10k.jsonl", is_hybrid=False)
-    validate_jsonl("data/processed/hybrid_test.jsonl", is_hybrid=True)
-    validate_jsonl("data/processed/hybrid_part1_long.jsonl", is_hybrid=True)
-    validate_jsonl("data/processed/hybrid_10k.jsonl", is_hybrid=True)
+    validate_jsonl("data/processed/human_binhvq_10k.jsonl", is_hybrid=False)
+    validate_jsonl("data/processed/hybrid_binhvq_test.jsonl", is_hybrid=True)
+    validate_jsonl("data/processed/hybrid_binhvq_part1_long.jsonl", is_hybrid=True)
+    validate_jsonl("data/processed/hybrid_binhvq_10k.jsonl", is_hybrid=True)

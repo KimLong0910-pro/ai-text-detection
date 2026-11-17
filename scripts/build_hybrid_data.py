@@ -2,19 +2,20 @@ import json
 import os
 import random
 import re
+import time
 import unicodedata
 
 import requests
 from tqdm import tqdm
 
-INPUT_FILE = "data/processed/human_10k.jsonl"
+INPUT_FILE = "data/processed/human_binhvq_10k.jsonl"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-# Bật True để test 15 mẫu (5 mẫu/model). Khi chạy thật đổi thành False.
+# Bật True để test 15 mẫu (5 mẫu/model). Khi chạy thật 5.000 mẫu đổi thành False.
 IS_TEST_MODE = True
 
 if IS_TEST_MODE:
-    OUTPUT_FILE = "data/processed/hybrid_test.jsonl"
+    OUTPUT_FILE = "data/processed/hybrid_binhvq_test.jsonl"
     START_INDEX = 0
     END_INDEX = 15
     MODEL_BATCHES = [
@@ -23,7 +24,7 @@ if IS_TEST_MODE:
         ("llama3.1:8b", 10, 15),
     ]
 else:
-    OUTPUT_FILE = "data/processed/hybrid_part1_long.jsonl"
+    OUTPUT_FILE = "data/processed/hybrid_binhvq_part1_long.jsonl"
     START_INDEX = 0
     END_INDEX = 5000
     MODEL_BATCHES = [
@@ -68,8 +69,8 @@ def call_ollama(
     temperature: float = 0.7,
 ) -> str:
     prompt = (
-        "Bạn là một cây bút báo chí tiếng Việt. Hãy viết tiếp đoạn văn sau một cách "
-        "tự nhiên, giữ nguyên văn phong, ngữ cảnh và không lặp lại câu đã cho. "
+        "Bạn là một cây bút báo chí tiếng Việt. Hãy viết tiếp đoạn văn sau ít nhất 2 đến 3 câu "
+        "một cách tự nhiên, giữ nguyên văn phong, ngữ cảnh và không lặp lại câu đã cho. "
         f"Chỉ trả về phần nội dung viết tiếp bằng tiếng Việt (khoảng {target_words} từ), "
         "không thêm lời dẫn:\n\n"
         f"{prefix_text}"
@@ -78,7 +79,7 @@ def call_ollama(
         "model": model_name,
         "prompt": prompt,
         "stream": False,
-        "keep_alive": "15m",
+        "keep_alive": "1m",
         "options": {
             "temperature": temperature,
             "top_p": 0.9,
@@ -97,7 +98,7 @@ def clean_ai_output(text: str, prefix_text: str) -> str:
     text = re.sub(r"^(Tiếp theo:|Phần viết tiếp:)\s*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
 
-    # Cắt bỏ câu bị ngắt lửng ở cuối do chạm trần num_predict
+    # Cắt bỏ câu bị ngắt lửng ở cuối nếu chạm trần num_predict
     if text and not text.endswith((".", "!", "?", '"', "”")):
         last_punct = max(text.rfind("."), text.rfind("!"), text.rfind("?"))
         if last_punct != -1 and last_punct > len(text) * 0.4:
@@ -107,7 +108,7 @@ def clean_ai_output(text: str, prefix_text: str) -> str:
 
 
 def is_valid_ai_output(ai_part: str) -> bool:
-    if len(ai_part.split()) < 25:
+    if len(ai_part.split()) < 20:
         return False
     lower_head = ai_part[:80].lower()
     if any(p in lower_head for p in REFUSAL_PATTERNS):
@@ -129,6 +130,11 @@ def load_done_ids(filepath: str) -> set:
 
 
 def main():
+    if not os.path.exists(INPUT_FILE):
+        raise FileNotFoundError(
+            f"Chưa tìm thấy {INPUT_FILE}. Bạn cần bấm Play file scripts/build_human_data.py trước!"
+        )
+
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         human_records = [json.loads(line) for line in f]
 
@@ -139,7 +145,7 @@ def main():
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "a", encoding="utf-8") as out:
-        for idx in tqdm(range(START_INDEX, END_INDEX), desc="Sinh Data lai"):
+        for idx in tqdm(range(START_INDEX, END_INDEX), desc="Sinh Hybrid (binhvq)"):
             rec = human_records[idx]
             if rec["id"] in done_ids:
                 continue
@@ -150,15 +156,13 @@ def main():
             human_prefix = " ".join(words[:cut_idx])
 
             primary_model = get_model_for_index(idx)
-            # Thử model chính 3 lần (tăng nhẹ temperature nếu lỗi); nếu vẫn từ chối thì dùng qwen2.5:7b cứu mẫu
+            # Thử lại tối đa 3 lần trên đúng model đang nằm sẵn trong RAM để tránh tràn 16GB
             attempts = [
                 (primary_model, 0.7),
                 (primary_model, 0.85),
-                (primary_model, 0.95),
-                ("qwen2.5:7b", 0.7),
+                (primary_model, 1.0),
             ]
 
-            used_model = primary_model
             ai_part = ""
             for model_name, temp in attempts:
                 try:
@@ -168,13 +172,13 @@ def main():
                     cleaned = clean_ai_output(raw_ai, human_prefix)
                     if is_valid_ai_output(cleaned):
                         ai_part = cleaned
-                        used_model = model_name
                         break
                 except Exception as e:
-                    print(f"\n[Thử lại mẫu {rec['id']} với {model_name}]: {e}")
+                    print(f"\n[Chờ 3s thử lại {rec['id']} với {model_name}]: {e}")
+                    time.sleep(3)
 
             if not ai_part:
-                print(f"\n[Bỏ qua mẫu {rec['id']}] Không thể sinh hợp lệ sau 4 lần thử.")
+                print(f"\n[Bỏ qua mẫu {rec['id']}] Không thể sinh hợp lệ sau 3 lần thử.")
                 continue
 
             ai_words = ai_part.split()
@@ -183,9 +187,9 @@ def main():
             word_labels = [0] * len(human_words) + [1] * len(ai_words)
 
             hybrid_record = {
-                "id": f"hybrid_{idx:05d}",
+                "id": f"hybrid_binhvq_{idx:05d}",
                 "parent_human_id": rec["id"],
-                "generator_model": used_model,
+                "generator_model": primary_model,
                 "label": 2,
                 "boundary_word_idx": len(human_words),
                 "human_part": human_prefix,

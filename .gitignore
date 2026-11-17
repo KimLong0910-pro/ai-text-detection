@@ -1,8 +1,10 @@
 # Hệ điều hành macOS
 .DS_Store
-.AppleDouble
-.LSOverride
 ._*
+
+# Biến môi trường & Token bảo mật (HuggingFace / API keys)
+.env
+.env.*
 
 # Môi trường ảo & Cache Python
 venv/
@@ -13,12 +15,23 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
-# IDE (VS Code)
+# IDE (VS Code / PyCharm)
 .vscode/
 .idea/
 
-# Dữ liệu lớn (tránh chạm giới hạn 100MB của GitHub)
+# Dữ liệu lớn & Cache HuggingFace (tránh chạm giới hạn 100MB của GitHub)
 data/raw/
 data/processed/*.jsonl
+*.parquet
+*.arrow
 *.zip
 *.tar.gz
+
+# Trọng số mô hình & Kết quả huấn luyện (PhoBERT / XLM-RoBERTa)
+*.pt
+*.pth
+*.bin
+*.safetensors
+checkpoints/
+results/
+logs/
