@@ -21,7 +21,9 @@ def evaluate_human(item: dict) -> list:
         warnings.append("Còn dấu gạch nối bị tách khoảng trắng (' - ')")
 
     # 3. Sót chú thích ảnh, tin liên quan hoặc tên phóng viên cuối bài
-    if re.search(r"(Ảnh\s*:|Xem thêm|Đọc thêm|Tin liên quan|\(Ảnh)", text, re.IGNORECASE):
+    if re.search(
+        r"(Ảnh\s*:|Xem thêm|Đọc thêm|Tin liên quan|\(Ảnh)", text, re.IGNORECASE
+    ):
         warnings.append("Còn sót rác báo chí (Ảnh / Xem thêm)")
 
     # 4. Lỗi viết thường đầu đoạn hoặc thiếu dấu kết câu
@@ -34,7 +36,9 @@ def evaluate_human(item: dict) -> list:
     words = text.split()
     num_tokens = sum(1 for w in words if any(c.isdigit() for c in w))
     if words and (num_tokens / len(words)) > 0.15:
-        warnings.append(f"Quá nhiều con số ({num_tokens}/{len(words)} từ - dễ là tin tỷ số/xổ số)")
+        warnings.append(
+            f"Quá nhiều con số ({num_tokens}/{len(words)} từ - dễ là tin tỷ số/xổ số)"
+        )
 
     return warnings
 
@@ -91,7 +95,9 @@ def inspect_human():
                 key = w.split("(")[0].strip()
                 reason_stats[key] = reason_stats.get(key, 0) + 1
 
-    print(f"Tổng số mẫu: {len(samples)} | ✅ Đạt chuẩn: {len(good_samples)} | ⚠️ Bị gắn cờ: {len(bad_samples)}")
+    print(
+        f"Tổng số mẫu: {len(samples)} | ✅ Đạt chuẩn: {len(good_samples)} | ⚠️ Bị gắn cờ: {len(bad_samples)}"
+    )
     if reason_stats:
         print("Chi tiết các lỗi phát hiện:")
         for k, v in sorted(reason_stats.items(), key=lambda x: -x[1]):
@@ -100,13 +106,17 @@ def inspect_human():
     random.seed(42)
     print("\n--- IN THỬ 3 MẪU HUMAN ✅ TỐT (NGẪU NHIÊN) ---")
     for item in random.sample(good_samples, min(3, len(good_samples))):
-        print(f"[{item['id']}] ({item['word_count']} từ) | Nguồn: {item['source_file']}")
+        print(
+            f"[{item['id']}] ({item['word_count']} từ) | Nguồn: {item['source_file']}"
+        )
         print(f"   {item['text']}\n")
 
     if bad_samples:
         print("--- IN THỬ TỐI ĐA 5 MẪU HUMAN ⚠️ CẦN XEM LẠI ---")
         for item, w_list in bad_samples[:5]:
-            print(f"[{item['id']}] ({item['word_count']} từ) | Lý do: {', '.join(w_list)}")
+            print(
+                f"[{item['id']}] ({item['word_count']} từ) | Lý do: {', '.join(w_list)}"
+            )
             print(f"   {item['text']}\n")
 
 
@@ -137,7 +147,9 @@ def inspect_hybrid():
         print(f"   [AI TIẾP ]: {item['ai_part']}")
         print("-" * 85)
 
-    print(f"TỔNG KẾT HYBRID: {good_count}/{len(samples)} mẫu đạt chuẩn tốt hoàn toàn.\n")
+    print(
+        f"TỔNG KẾT HYBRID: {good_count}/{len(samples)} mẫu đạt chuẩn tốt hoàn toàn.\n"
+    )
 
 
 if __name__ == "__main__":
