@@ -8,18 +8,22 @@ HUMAN_FILE = "data/processed/human_binhvq_10k.jsonl"
 # Đổi thành "data/processed/hybrid_binhvq_part1_long.jsonl" khi kiểm tra bản chạy thật 5.000 mẫu
 HYBRID_FILE = "data/processed/hybrid_binhvq_test.jsonl"
 
+MAX_HUMAN_GOOD_DISPLAY = 3  # Số mẫu Human tốt muốn in thử
+MAX_HUMAN_BAD_DISPLAY = 15 # Số mẫu Human lỗi muốn in thử
 MAX_HYBRID_DISPLAY = 15
 USE_COLORS = True  # Tô màu phân biệt trên Terminal macOS
 
 # Mã màu ANSI cho Terminal
 C_RESET = "\033[0m" if USE_COLORS else ""
-C_HUMAN = "\033[96m" if USE_COLORS else ""          # Xanh lơ nhạt: Phần người viết
-C_AI = "\033[92m" if USE_COLORS else ""             # Xanh lá nhạt: Phần AI viết tiếp
-C_MARKER = "\033[1;93m" if USE_COLORS else ""       # Vàng đậm: Mốc ranh giới chuyển tiếp
-C_WARN = "\033[91m" if USE_COLORS else ""           # Đỏ chữ: Cảnh báo lỗi
-C_ERR_BG = "\033[1;41;97m" if USE_COLORS else "【"  # Nền đỏ chữ trắng: Bôi đậm đúng chỗ lỗi
+C_HUMAN = "\033[96m" if USE_COLORS else ""  # Xanh lơ nhạt: Phần người viết
+C_AI = "\033[92m" if USE_COLORS else ""  # Xanh lá nhạt: Phần AI viết tiếp
+C_MARKER = "\033[1;93m" if USE_COLORS else ""  # Vàng đậm: Mốc ranh giới chuyển tiếp
+C_WARN = "\033[91m" if USE_COLORS else ""  # Đỏ chữ: Cảnh báo lỗi
+C_ERR_BG = (
+    "\033[1;41;97m" if USE_COLORS else "【"
+)  # Nền đỏ chữ trắng: Bôi đậm đúng chỗ lỗi
 C_ERR_END = "\033[0m" if USE_COLORS else "】"
-C_NOTE = "\033[95m" if USE_COLORS else ""           # Tím nhạt: Nhận xét phân tích
+C_NOTE = "\033[95m" if USE_COLORS else ""  # Tím nhạt: Nhận xét phân tích
 
 LLM_CHAT_ARTIFACTS = (
     "dưới đây là",
@@ -44,9 +48,37 @@ AI_CLICHE_TRANSITIONS = (
 )
 
 VI_STOPWORDS = {
-    "và", "của", "là", "các", "những", "được", "trong", "cho", "với", "tại",
-    "đã", "đang", "sẽ", "về", "từ", "này", "đó", "khi", "để", "như", "một",
-    "có", "không", "người", "năm", "ngày", "theo", "cũng", "nhưng", "vào", "ra",
+    "và",
+    "của",
+    "là",
+    "các",
+    "những",
+    "được",
+    "trong",
+    "cho",
+    "với",
+    "tại",
+    "đã",
+    "đang",
+    "sẽ",
+    "về",
+    "từ",
+    "này",
+    "đó",
+    "khi",
+    "để",
+    "như",
+    "một",
+    "có",
+    "không",
+    "người",
+    "năm",
+    "ngày",
+    "theo",
+    "cũng",
+    "nhưng",
+    "vào",
+    "ra",
 }
 
 
@@ -95,7 +127,9 @@ def evaluate_human(item: dict) -> tuple[list, str]:
     if text and text[0].islower():
         warnings.append("Chữ cái đầu đoạn viết thường")
         first_word = words[0] if words else text[0]
-        highlighted = f"{C_ERR_BG}{first_word}{C_ERR_END}" + highlighted[len(first_word) :]
+        highlighted = (
+            f"{C_ERR_BG}{first_word}{C_ERR_END}" + highlighted[len(first_word) :]
+        )
 
     # 6. Cuối bài thiếu dấu kết câu
     if text and not text.endswith((".", "!", "?", '"', "”")):
@@ -110,7 +144,9 @@ def evaluate_human(item: dict) -> tuple[list, str]:
         warnings.append(
             f"Quá nhiều con số ({len(num_tokens)}/{len(words)} từ - dễ là tin tỷ số/xổ số)"
         )
-        highlighted = re.sub(r"(\b\S*\d\S*\b)", rf"{C_ERR_BG}\1{C_ERR_END}", highlighted)
+        highlighted = re.sub(
+            r"(\b\S*\d\S*\b)", rf"{C_ERR_BG}\1{C_ERR_END}", highlighted
+        )
 
     # 8. Tỷ lệ từ tiếng Anh / không dấu quá cao (>25%)
     ascii_tokens = [w for w in words if re.fullmatch(r"[A-Za-z]{4,}", w)]
@@ -118,7 +154,9 @@ def evaluate_human(item: dict) -> tuple[list, str]:
         warnings.append(
             f"Nhiều từ tiếng Anh/không dấu ({len(ascii_tokens)}/{len(words)} từ)"
         )
-        highlighted = re.sub(r"\b([A-Za-z]{4,})\b", rf"{C_ERR_BG}\1{C_ERR_END}", highlighted)
+        highlighted = re.sub(
+            r"\b([A-Za-z]{4,})\b", rf"{C_ERR_BG}\1{C_ERR_END}", highlighted
+        )
 
     return warnings, highlighted
 
@@ -255,7 +293,7 @@ def inspect_human():
     avg_words = sum(word_counts) / len(word_counts) if word_counts else 0
     print(
         f"Tổng số mẫu: {len(samples)} | Trung bình: {avg_words:.1f} từ/mẫu | "
-        f"✅ Đạt chuẩn: {len(good_samples)} ({len(good_samples)/max(1,len(samples))*100:.1f}%) | "
+        f"✅ Đạt chuẩn: {len(good_samples)} ({len(good_samples) / max(1, len(samples)) * 100:.1f}%) | "
         f"⚠️ Bị gắn cờ: {len(bad_samples)}"
     )
     if reason_stats:
@@ -264,15 +302,21 @@ def inspect_human():
             print(f"   - {k}: {v} mẫu")
 
     random.seed(42)
-    print("\n--- IN THỬ 3 MẪU HUMAN ✅ TỐT (NGẪU NHIÊN) ---")
-    for item in random.sample(good_samples, min(3, len(good_samples))):
-        print(f"[{item['id']}] ({item['word_count']} từ) | Nguồn: {item['source_file']}")
+    num_good = min(MAX_HUMAN_GOOD_DISPLAY, len(good_samples))
+    print(f"\n--- IN THỬ {num_good} MẪU HUMAN ✅ TỐT (NGẪU NHIÊN) ---")
+    for item in random.sample(good_samples, num_good):
+        print(
+            f"[{item['id']}] ({item['word_count']} từ) | Nguồn: {item['source_file']}"
+        )
         print(f"   {C_HUMAN}{item['text']}{C_RESET}\n")
 
     if bad_samples:
-        print("--- IN THỬ TỐI ĐA 5 MẪU HUMAN ⚠️ CẦN XEM LẠI ---")
-        for item, w_list, highlighted in bad_samples[:5]:
-            print(f"[{item['id']}] ({item['word_count']} từ) | {C_WARN}Lý do: {', '.join(w_list)}{C_RESET}")
+        num_bad = min(MAX_HUMAN_BAD_DISPLAY, len(bad_samples))
+        print(f"--- IN THỬ {num_bad} MẪU HUMAN ⚠️ CẦN XEM LẠI ---")
+        for item, w_list, highlighted in bad_samples[:num_bad]:
+            print(
+                f"[{item['id']}] ({item['word_count']} từ) | {C_WARN}Lý do: {', '.join(w_list)}{C_RESET}"
+            )
             print(f"   📝 Văn bản đánh dấu lỗi:\n      {highlighted}\n")
             print("-" * 95)
 
@@ -308,7 +352,7 @@ def inspect_hybrid():
 
     print(
         f"TỔNG KẾT HYBRID: ✅ Đạt chuẩn {len(good_samples)}/{len(samples)} mẫu "
-        f"({len(good_samples)/max(1,len(samples))*100:.1f}%) | ⚠️ Bị gắn cờ: {len(bad_samples)}"
+        f"({len(good_samples) / max(1, len(samples)) * 100:.1f}%) | ⚠️ Bị gắn cờ: {len(bad_samples)}"
     )
     print("Thống kê chất lượng theo từng Model AI:")
     for m, st in model_stats.items():
